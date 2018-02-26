@@ -366,8 +366,11 @@ message HeaderBBox {
 
 We can go through the process of decoding the HeaderBlock and HeaderBBox manually, but it's probably best to just let the ProtocolBuffer library take care of things from here on out.
 
+![Diagram of decompressed zlib data blob containing a struct which contains a struct](./i/struct_in_struct.gif)
+
+
 The important thing to note is the nesting of the data structure.
 
-![Diagram of decompressed zlib data blob containing a struct which contains a struct](./i/struct_in_struct.gif)
+![Nesting dolls GIF](./gifs/nesting_dolls.gif)
 
 Here we have a Blob, which contains compressed data representing a struct, which itself contains structs.  Once we're done decompressing the data, the ProtocolBuffer library will handle all of the nested Messages for us when we unmarshal each Message.
