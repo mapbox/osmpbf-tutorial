@@ -30,6 +30,12 @@ Each square represents a byte.  Inside each is written its corresponding hex cod
 
 When a byte represents an ANSI character, I've used that character instead of the byte value and colored the square green.  The rest of the squares are colored based on what type of value they contain.
 
+## Fileformat
+
+You might notice we're skipping a whole bunch of bytes (in the grey box), as if they're not important.  This is because we're going to get back to them after we're done looking at the first part of the OSMPBF specification, [fileformat](https://wiki.openstreetmap.org/wiki/PBF_Format#File_format).  The fileformat doesn't contain any actual map data, but it gives us information about chunks of map data, [OSMData](https://wiki.openstreetmap.org/wiki/PBF_Format#Definition_of_OSMData_fileblock), which are compressed using zlib and placed in those grey boxes for later extraction.
+
+For now, we'll focus on the file format, so we can get a better understanding of how ProtocolBuffers work.
+
 Let's start learning more about each byte.
 
 ### Size Delimiter
