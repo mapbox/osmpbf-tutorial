@@ -368,4 +368,4 @@ The important thing to note is the nesting of the data structure.
 
 ![Diagram of decompressed zlib data blob containing a struct which contains a struct](./i/struct_in_struct.gif)
 
-Here we have a Blob, which contains compressed data representing a struct, which itself contains structs.  Once we're done decompressing the data, of course, the ProtocolBuffer library will handle all this nesting for us programmatically when we unmarshal each Message.
+Here we have a Blob, which contains compressed data representing a struct, which itself contains structs.  Once we're done decompressing the data, the ProtocolBuffer library will handle all of the nested Messages for us when we unmarshal each Message.
