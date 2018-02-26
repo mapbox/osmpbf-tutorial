@@ -146,7 +146,9 @@ That means we take `00000001` (from x01) and put it in front of `01100001` (from
 
 ![xB001 = 101100001](./i/b001_varint.gif)
 
-Phew, that's a lot of work.
+Phew, that's a lot of work!
+
+![](./gifs/bunny_sleep.gif)
 
 But now we can see that this line from our xxd output...
 
