@@ -362,7 +362,10 @@ message HeaderBBox {
 }
 ```
 
-The next byte, `x08` in hex is `00001000` in binary.  Field number 1 (left), wiretype 0 (varint). 
+We can go through the process of decoding the HeaderBlock and HeaderBBox manually, but it's probably best to just let the ProtocolBuffer library take care of things from here on out.
 
-We go through the bytes until we get one with its most significant (first) bit set to 0, then put it together and decode it. 
+The important thing to note is the nesting of the data structure.
 
+![Diagram of decompressed zlib data blob containing a struct which contains a struct](./i/struct_in_struct.gif)
+
+Here we have a Blob, which contains compressed data representing a struct, which itself contains structs.  Once we're done decompressing the data, of course, the ProtocolBuffer library will handle all this nesting for us programmatically when we unmarshal each Message.
