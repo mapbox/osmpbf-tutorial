@@ -78,11 +78,9 @@ Let's look at the diagram for a better view of what these fourteen bytes mean.
 
 This is a [ProtocolBuffer](https://developers.google.com/protocol-buffers/docs/encoding) message.  ProtocolBuffer is a binary format made by Google and then [opensourced](https://github.com/google/protobuf).  It's a lot like JSON, but designed to be smaller and faster, and readable by many different programming languages so that separate codebases can send messages to each other to get things done.
 
-The first byte, `0A`, tells us the field and datatype of the data that follows it.  This is actually *two* values smooshed into a single byte, so we have to go through it...
+The first byte, `0A`, tells us the field and datatype of the data that follows it.  This is actually *two* values smooshed into a single byte, so we have to go through it bit-by-bit.
 
-![pundog](./i/pundog.png)
-
-...bit-by-bit.
+![GIF from Steven Universe where the humans in the human zoo repeat "the bits" over and over upon meeting Steven because they were given the impression from his father that this is Steven's catchphrase.](./gifs/the_bits.gif)
 
 The first five bits tell us the number of the field.
 
@@ -271,7 +269,7 @@ Notice that the data type is different, but the Blob is exactly the same as befo
 We know we're dealing with a zlib-compressed set of data with a size of 61,320 bytes.
 
 ```
-{"raw_size": 161, "zlib_data": [170 bytes...] }
+{"raw_size": 161, "zlib_data": [61328 bytes...] }
 ```
 
 Zooming out, we should see that it looks very familiar.
@@ -294,3 +292,77 @@ until (file.position == size_of_file) {
 	// do things with the data
 }
 ```
+
+## Decoding Blobs
+
+So far we've done a lot of bitshifting, but we haven't actually looked at any map data.
+
+Let's decode our first blob.
+
+If we take the bytes in that grey blob and run them through the zlib decompression algoritm, we'll get the following bytes:
+
+```
+00000000: 0a1c 08bf daba cbbe 0410 bffe 9882 bd04  ................
+00000010: 18e0 c8c1 c5a2 0220 c0ff a682 a102 220e  ....... ......".
+00000020: 4f73 6d53 6368 656d 612d 5630 2e36 220a  OsmSchema-V0.6".
+00000030: 4465 6e73 654e 6f64 6573 8201 0c6f 736d  DenseNodes...osm
+00000040: 6975 6d2f 312e 352e 3180 02e6 d3fc d005  ium/1.5.1.......
+00000050: 8802 b50d 9202 4a68 7474 703a 2f2f 646f  ......Jhttp://do
+00000060: 776e 6c6f 6164 2e67 656f 6661 6272 696b  wnload.geofabrik
+00000070: 2e64 652f 6e6f 7274 682d 616d 6572 6963  .de/north-americ
+00000080: 612f 7573 2f64 6973 7472 6963 742d 6f66  a/us/district-of
+00000090: 2d63 6f6c 756d 6269 612d 7570 6461 7465  -columbia-update
+000000a0: 73                                       s
+```
+
+We can see what data it contains by looking at the OSMPBF specification for [OSMHeader](https://wiki.openstreetmap.org/wiki/PBF_Format#Definition_of_the_OSMHeader_fileblock), which corresponds to the `HeaderBlock` section of the Protobuf specification.
+
+```
+message HeaderBlock {
+  optional HeaderBBox bbox = 1;
+  /* Additional tags to aid in parsing this dataset */
+  repeated string required_features = 4;
+  repeated string optional_features = 5;
+
+  optional string writingprogram = 16;
+  optional string source = 17; // From the bbox field.
+
+  /* Tags that allow continuing an Osmosis replication */
+
+  // replication timestamp, expressed in seconds since the epoch,
+  // otherwise the same value as in the "timestamp=..." field
+  // in the state.txt file used by Osmosis
+  optional int64 osmosis_replication_timestamp = 32;
+
+  // replication sequence number (sequenceNumber in state.txt)
+  optional int64 osmosis_replication_sequence_number = 33;
+
+  // replication base URL (from Osmosis' configuration.txt file)
+  optional string osmosis_replication_base_url = 34;
+}
+
+```
+
+The first byte, `x0a`, is pretty simple; we've already seen it before.  It means we have a field number of 1 and a wire type of 2.
+
+The last time we looked at an `x0a` byte, that meant that we were looking at a `type` field from the BlobHeader specification as a length-delimited string.  This time, we're looking at the HeaderBlock specification, where the field number one is defined as a `HeaderBBox` type, which is a length-delimited (wiretype 2) range of bytes representing a `HeaderBBox`.
+
+So how big is the HeaderBBox?  `x1c` as a varint, or 00011100 as a complete byte, which stripped of leading zeros is 11100 and converted to decimal (base10) is 28.
+
+So the next 28 bytes represent a HeaderBBox!  Which means our next byte is the start of a new Message of the HeaderBBox type, which we should be able to guess by now is a field and wiretype byte.
+
+Here's the specification for HeaderBBox.
+
+```
+message HeaderBBox {
+   required sint64 left = 1;
+   required sint64 right = 2;
+   required sint64 top = 3;
+   required sint64 bottom = 4;
+}
+```
+
+The next byte, `x08` in hex is `00001000` in binary.  Field number 1 (left), wiretype 0 (varint). 
+
+We go through the bytes until we get one with its most significant (first) bit set to 0, then put it together and decode it. 
+
