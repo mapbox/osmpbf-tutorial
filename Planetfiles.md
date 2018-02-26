@@ -108,9 +108,11 @@ If we were using JSON, we could encode the same information as `{"type":"OSMHead
 
 After we're done processing all nine bytes of our string, we know that we're done with that data and the next byte must represent the next field and wiretype.
 
+Next up is `x18`, or `00011000` in binary.
+
 ![x18 = 00011000](./i/18_fieldwire.gif)
 
-This has a field number of three, so it represents the datasize.  Its wire type is 0, meaning it's a *varint*.
+This has a field number of 3 (`00011`), so it represents the datasize.  Its wire type is 0, meaning it's a *varint*.
 
 Varints are a bit tricky.  Thankfully, we have a bunch of them to practice with!
 
@@ -122,7 +124,7 @@ If the first bit of the byte (MSB) is one, we need to look at the next byte.  If
 
 If we look at our next byte, `xB0`, in binary, we can see that the first bit is set to 1.
 
-![xB0 = 10110000](./i/xB0_msb.gif)
+![xB0 = 10110000](./i/xb0_msb.gif)
 
 This means that the next byte is also part of our number.  The remaining seven bits are the first bits of our number.
 
@@ -136,9 +138,9 @@ If we take the last seven bits of each of these bytes, we get `01100001` and `00
 
 The one tricky thing we have to do is reassemble these bytes in *reverse* order, but then we'll be done!
 
-That means we take `00000001` (from x01) and put it in front of `01100001` (from 1xB0) to get `0000000101100001`.  We can trim off the leading zeros to get `101100001`, or 176.
+That means we take `00000001` (from x01) and put it in front of `01100001` (from xB0) to get `0000000101100001`.  We can trim off the leading zeros to get `101100001`, or 176.
 
-![](./i/b001_varint.gif)
+![xB001 = 101100001](./i/b001_varint.gif)
 
 Phew, that's a lot of work.
 
@@ -184,11 +186,11 @@ The good news is we only need to decode six bytes of this!
 
 Let's take a look at the first byte in our Blob, `x10`.
 
-![](./i/10_fieldwire.gif)
+![x10 = 00010000](./i/10_fieldwire.gif)
 
 Looking at the [Blob](https://wiki.openstreetmap.org/wiki/PBF_Format#File_format) definition on the wiki, we can see that this is a field type of 2, or `raw_size`, and a wire type of our new favorite data type, `varint`!
 
-![xA101 = 0000001 ++ 0100001](a101_varint.gif)
+![xA101 = 0000001 ++ 0100001](./i/a101_varint.gif)
 
 Decoding `xA101`, we get `0000001 ++ 0100001`, or `10100001`, which equals 161.
 
