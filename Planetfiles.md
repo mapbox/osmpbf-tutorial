@@ -220,11 +220,11 @@ Zooming out a bit, we can take a look at all the data we've processed so far.
 
 ### Using ProtocolBuffer Libraries
 
-That's a lot work!  Thankfully, Google has already [opensourced code](https://github.com/google/protobuf) to decode ProtocolBuffer formatted messages in all major languages.  The only thing we have to do is break up a file into individual messages, then *Unmarshall* them through the language-specific ProtocolBuffer library of our choice.
+That's a lot work!  Thankfully, Google has already [opensourced code](https://github.com/google/protobuf) to decode ProtocolBuffer formatted messages in all major languages.  The only thing we have to do is break up a file into individual messages, then *Unmarshal* them through the language-specific ProtocolBuffer library of our choice.
 
-All we really have to do is look at the first *four* bytes of the file, grab that many bytes, and then pop them directly into the Unmarshall function of the protobuf library.
+All we really have to do is look at the first *four* bytes of the file, grab that many bytes, and then pop them directly into the Unmarshal function of the protobuf library.
 
-![](unmarshall.gif)
+![](unmarshal.gif)
 
 This will output our data, just like if we were using JSON!
 
