@@ -373,4 +373,4 @@ The important thing to note is the nesting of the data structure.
 
 ![Nesting dolls GIF](./gifs/nesting_dolls.gif)
 
-Here we have a Blob, which contains compressed data representing a struct, which itself contains structs.  Once we're done decompressing the data, the ProtocolBuffer library will handle all of the nested Messages for us when we unmarshal each Message.
+Here we have a Blob, which contains compressed data representing a Message, which itself contains Messages.  Once we're done decompressing the data, the ProtocolBuffer library will handle all of the nested Messages for us when we unmarshal each block of data.
