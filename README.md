@@ -400,13 +400,161 @@ The cool thing about PrimitiveBlocks is that they're completely self-contained. 
 
 ### PrimitiveGroup
 
-All map data entities are held in a PrimitiveGroup.  A PrimitiveGroup has specified repeating (array) fields for Nodes, DenseNodes, Ways, and Relations, and as such *can* hold all of these.  In practice, however, a PrimitiveGroup will only hold *one* type of data.  Each of the repeating fields are optional, and as such can be omitted if they're not needed.
+All map data entities are held in a PrimitiveGroup.  A PrimitiveGroup has specified repeating (array) fields for Nodes, DenseNodes, Ways, and Relations, and as such *can* hold all of these, according to ProtocolBuffer rules, but should *never* include any more than one type, according to OSMPBF rules.  Each of the repeating fields are optional, and as such can be omitted if they're not needed.  This means you should only see one of these fields used per PrimitiveGroup.
 
 We can see in our PrimitiveBlock diagram examples of PrimitiveGroups.  One contains a series of Nodes, and the other contains a series of Ways.
-
 
 ### Ways, Nodes, and Relations
 
 Finally, we have actual map-related data to work with!
 
 ![An excited child holding a wrapped present](./gifs/excited_gift.gif)
+
+For reference, here's the database schema relevant to these three models from the [Rails Port (APIDB) schema](https://chrisnatali.github.io/osm_notes/osm_schema.html).
+
+![Rails APIDB database schema diagram.](./i/rails_schema.gif)
+
+We can also take a look at the [Rails Port SQL structure](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql) directly to see how the data relates.
+
+#### Nodes and DenseNodes
+
+Let's look at some of the CREATE TABLE statements for [nodes](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql#L752) and [node_tags](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql#L740) to see what sort of data we can expect to get back eventually.
+
+```
+CREATE TABLE nodes (
+    node_id bigint NOT NULL,
+    latitude integer NOT NULL,
+    longitude integer NOT NULL,
+    changeset_id bigint NOT NULL,
+    visible boolean NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    tile bigint NOT NULL,
+    version bigint NOT NULL,
+    redaction_id integer
+);
+```
+
+```
+CREATE TABLE node_tags (
+    node_id bigint NOT NULL,
+    version bigint NOT NULL,
+    k character varying(255) DEFAULT ''::character varying NOT NULL,
+    v character varying(255) DEFAULT ''::character varying NOT NULL
+);
+```
+
+We should be able to get all of this from the [OSMPBF Protobuf Specification for Nodes](https://github.com/brettch/OSM-binary/blob/master/src/osmformat.proto#L192).
+
+```
+message Node {
+   required sint64 id = 1;
+   // Parallel arrays.
+   repeated uint32 keys = 2 [packed = true]; // String IDs.
+   repeated uint32 vals = 3 [packed = true]; // String IDs.
+
+   optional Info info = 4; // May be omitted in omitmeta
+
+   required sint64 lat = 8;
+   required sint64 lon = 9;
+}
+```
+
+#### Ways
+
+Here are the CREATE TABLE statements for [ways](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql#L1173).
+
+```
+CREATE TABLE way_nodes (
+    way_id bigint NOT NULL,
+    node_id bigint NOT NULL,
+    version bigint NOT NULL,
+    sequence_id bigint NOT NULL
+);
+
+CREATE TABLE way_tags (
+    way_id bigint DEFAULT 0 NOT NULL,
+    k character varying(255) NOT NULL,
+    v character varying(255) NOT NULL,
+    version bigint NOT NULL
+);
+
+CREATE TABLE ways (
+    way_id bigint DEFAULT 0 NOT NULL,
+    changeset_id bigint NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    version bigint NOT NULL,
+    visible boolean DEFAULT true NOT NULL,
+    redaction_id integer
+);
+```
+
+And the [OSMPBF Protobuf Specification for Ways](https://github.com/brettch/OSM-binary/blob/master/src/osmformat.proto#L230).
+
+```
+message Way {
+   required int64 id = 1;
+   // Parallel arrays.
+   repeated uint32 keys = 2 [packed = true];
+   repeated uint32 vals = 3 [packed = true];
+
+   optional Info info = 4;
+
+   repeated sint64 refs = 8 [packed = true];  // DELTA coded
+}
+```
+
+#### Relations
+
+Finally, the [SQL for Relations](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql#L953).
+
+```
+CREATE TABLE relation_members (
+    relation_id bigint DEFAULT 0 NOT NULL,
+    member_type nwr_enum NOT NULL,
+    member_id bigint NOT NULL,
+    member_role character varying(255) NOT NULL,
+    version bigint DEFAULT 0 NOT NULL,
+    sequence_id integer DEFAULT 0 NOT NULL
+);
+
+CREATE TABLE relation_tags (
+    relation_id bigint DEFAULT 0 NOT NULL,
+    k character varying(255) DEFAULT ''::character varying NOT NULL,
+    v character varying(255) DEFAULT ''::character varying NOT NULL,
+    version bigint NOT NULL
+);
+
+CREATE TABLE relations (
+    relation_id bigint DEFAULT 0 NOT NULL,
+    changeset_id bigint NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    version bigint NOT NULL,
+    visible boolean DEFAULT true NOT NULL,
+    redaction_id integer
+);
+```
+
+And the [OSMPBF Specification](https://github.com/brettch/OSM-binary/blob/master/src/osmformat.proto#L241).
+
+```
+message Relation {
+  enum MemberType {
+    NODE = 0;
+    WAY = 1;
+    RELATION = 2;
+  } 
+   required int64 id = 1;
+
+   // Parallel arrays.
+   repeated uint32 keys = 2 [packed = true];
+   repeated uint32 vals = 3 [packed = true];
+
+   optional Info info = 4;
+
+   // Parallel arrays
+   repeated int32 roles_sid = 8 [packed = true];
+   repeated sint64 memids = 9 [packed = true]; // DELTA encoded
+   repeated MemberType types = 10 [packed = true];
+}
+```
+
