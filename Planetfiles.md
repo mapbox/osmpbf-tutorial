@@ -26,7 +26,7 @@ Don't worry if you don't have time to read through this yourself! We'll go throu
 
 ![](./i/diagram_file_header.gif)
 
-Each square represents a byte.  Inside each is written its corresponding hex code, which is like a normal number but in base 16 instead of base 10.  Two hex digits can represent very possible byte value (0-FF), which would take three decimal digits (0-255).
+Each square represents a byte.  Inside each is written its corresponding hex code, which is like a normal number but in base 16 instead of base 10.  Two hex digits can represent very possible byte value (0-FF), which would take three decimal digits (0-255).  In descriptions, we can use `x` in front of our hex values so that they don't get confused with decimal.  For example, `x18` is equal to 24 in decimal.
 
 When a byte represents an ANSI character, I've used that character instead of the byte value and colored the square green.  The rest of the squares are colored based on what type of value they contain.
 
@@ -56,7 +56,7 @@ Or, a slightly friendlier view, from our diagram.
 
 This is a pretty easy one; all we have to do is translate this from base16 (hex) to base10.  This is something that computers do better than humans, so I'd recommend using your favorite programming language or [an online calculator](https://www.rapidtables.com/convert/number/base-converter.html) instead of trying to do it manually.
 
-We can ignore the first three bytes entirely, as they're all 0 and leading zeroes don't mean anything; 0000000E is the same as 0E, which is the same as E.  In hex notation, E is equal to 14.
+We can ignore the first three bytes entirely, as they're all 0 and leading zeroes don't mean anything; 0000000E is the same as `x0E`, which is the same as `xE`.  In hex notation, `xE` is equal to 14.
 
 Now we know that the next chunk of data that we want to process is fourteen bytes long.
 
@@ -78,19 +78,21 @@ Let's look at the diagram for a better view of what these fourteen bytes mean.
 
 This is a [ProtocolBuffer](https://developers.google.com/protocol-buffers/docs/encoding) message.  ProtocolBuffer is a binary format made by Google and then [opensourced](https://github.com/google/protobuf).  It's a lot like JSON, but designed to be smaller and faster, and readable by many different programming languages so that separate codebases can send messages to each other to get things done.
 
-The first byte, `0A`, tells us the field and datatype of the data that follows it.  This is actually *two* values smooshed into a single byte, so we have to go through it bit-by-bit.
+The first byte, `x0A`, tells us the field and datatype of the data that follows it.  This is actually *two* values smooshed into a single byte, so we have to go through it bit-by-bit.
 
 ![GIF from Steven Universe where the humans in the human zoo repeat "the bits" over and over upon meeting Steven because they were given the impression from his father that this is Steven's catchphrase.](./gifs/the_bits.gif)
 
 The first five bits tell us the number of the field.
 
-The next three bytes represent the *wire type* or what *kind* of data is coming up next.  [Google's documentation](https://developers.google.com/protocol-buffers/docs/encoding#structure) has a table of all available wire types, which we can use to lookup what kind of data is coming up next.
+The next three bytes represent the *wire type* or what *kind* of data is coming up next.
 
-![](./i/wiretypes.gif)
-
-So, zooming into `0A` byte and looking at each of its eight bits individually, we can see that the field number is 1, and the wire type is 2.
+So, zooming into `x0A` byte and looking at each of its eight bits individually, we can see that the field number is 1, and the wire type is 2.
 
 ![x0A = 00001010](./i/0a_fieldwire.gif)
+
+[Google's documentation](https://developers.google.com/protocol-buffers/docs/encoding#structure) has a table of all available wire types, which we can use to lookup what kind of data is coming up next.
+
+![](./i/wiretypes.gif)
 
 We know that this is a [BlobHeader](https://wiki.openstreetmap.org/wiki/PBF_Format#File_format) because it's documented on the OSMWiki.  A BlobHeader's data definition looks like this...
 
@@ -106,7 +108,7 @@ The second line of our BlobHeader definition (`string type = 1;`) tells us that 
 
 The wiretype table tells us that a wire type of 2 is a *length-delimited string*.  That means we'll have one or more bytes that tell us the *length* of the string, followed by that many bytes containing the ASCII codes for the string itself.
 
-Which means the *first two bytes* in this segment, `0A` and `09` tell us that there is a nine-character string coming up next.  When we grab the next nine bytes and convert them to ASCII, we get the string "OSMHeader".
+Which means the *first two bytes* in this segment, `x0A` and `x09` tell us that there is a nine-character string coming up next.  When we grab the next nine bytes and convert them to ASCII, we get the string "OSMHeader".
 
 If we were using JSON, we could encode the same information as `{"type":"OSMHeader"}`, but it would take 20 bytes instead of 11, and wouldn't give us the same level of insight into what type of data we're looking at.
 
@@ -120,7 +122,7 @@ This has a field number of 3 (`00011`), so it represents the datasize.  Its wire
 
 Varints are a bit tricky.  Thankfully, we have a bunch of them to practice with!
 
-The largest number that you can store in one byte is 255 (hex FF).  If you know you need larger numbers than that, you can specify more bytes for your data.  For example, with two bytes we can store up to 65,535 (hex FFFF), with three bytes 16,777,215 (hex FFFFFF), and so forth.
+The largest number that you can store in one byte is 255 (`xFF`).  If you know you need larger numbers than that, you can specify more bytes for your data.  For example, with two bytes we can store up to 65,535 (`xFFFF`), with three bytes 16,777,215 (`xFFFFFF`), and so forth.
 
 Varints allow us to store *any number* we choose, without reserving bytes that we might not need for it.  It does this by using the first bit of each byte to tell us whether or not we need to look at the next byte.  If we were feeling fancy we could call this first bit the *Most Significant Bit*, or MSB.
 
@@ -226,7 +228,7 @@ Zooming out a bit, we can take a look at all the data we've processed so far.
 
 ### Using ProtocolBuffer Libraries
 
-That's a lot work!  Thankfully, Google has already [opensourced code](https://github.com/google/protobuf) to decode ProtocolBuffer formatted messages in all major languages.  The only thing we have to do is break up a file into individual messages, then *Unmarshal* them through the language-specific ProtocolBuffer library of our choice.
+That's a lot work!  Thankfully, Google has already [opensourced code](https://github.com/google/protobuf) to decode ProtocolBuffer formatted messages in all major languages.  The only thing we have to do is break up a file into individual messages, then *unmarshal* them through the language-specific ProtocolBuffer library of our choice.
 
 All we really have to do is look at the first *four* bytes of the file, grab that many bytes, and then pop them directly into the Unmarshal function of the protobuf library.
 
@@ -322,24 +324,12 @@ We can see what data it contains by looking at the OSMPBF specification for [OSM
 ```
 message HeaderBlock {
   optional HeaderBBox bbox = 1;
-  /* Additional tags to aid in parsing this dataset */
   repeated string required_features = 4;
   repeated string optional_features = 5;
-
   optional string writingprogram = 16;
   optional string source = 17; // From the bbox field.
-
-  /* Tags that allow continuing an Osmosis replication */
-
-  // replication timestamp, expressed in seconds since the epoch,
-  // otherwise the same value as in the "timestamp=..." field
-  // in the state.txt file used by Osmosis
   optional int64 osmosis_replication_timestamp = 32;
-
-  // replication sequence number (sequenceNumber in state.txt)
   optional int64 osmosis_replication_sequence_number = 33;
-
-  // replication base URL (from Osmosis' configuration.txt file)
   optional string osmosis_replication_base_url = 34;
 }
 
@@ -368,9 +358,9 @@ We can go through the process of decoding the HeaderBlock and HeaderBBox manuall
 
 ![Diagram of decompressed zlib data blob containing a struct which contains a struct](./i/struct_in_struct.gif)
 
-
 The important thing to note is the nesting of the data structure.
 
 ![Nesting dolls GIF](./gifs/nesting_dolls.gif)
 
 Here we have a Blob, which contains compressed data representing a Message, which itself contains Messages.  Once we're done decompressing the data, the ProtocolBuffer library will handle all of the nested Messages for us when we unmarshal each block of data.
+
