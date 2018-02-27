@@ -390,9 +390,13 @@ Remember the nesting?  Good, because OSMData blobs are nested pretty deeply.
 
 ### PrimitiveBlock
 
-PrimitiveBlocks still don't store our data, but they store a lot of metadata about the data they contain, along with a repeating field (array) of PrimitveGroups.
+PrimitiveBlocks still don't store our data, but they store a lot of metadata about the data they contain, along with a repeating field (array) of PrimitiveGroups.
 
 ![PrimitiveBlock](./i/primitive_block.gif)
+
+The cool thing about PrimitiveBlocks is that they're completely self-contained.  If you take a Blob (and its BlobHeader) containing a PrimitiveBlock and you place an OSMHeader BlobHeader + Blob on top of it, you have a perfectly valid OSMPBF file.
+
+![Full file with an OSMHeader and OSMData blobs](./i/header_and_data.gif)
 
 ### PrimitiveGroup
 
