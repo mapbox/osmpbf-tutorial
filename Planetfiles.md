@@ -1,5 +1,13 @@
 # What's in a Planetfile?
 
+There are three main datatypes for OSM Planetfile data: Nodes, Ways, and Relations.
+
+Unfortunately for us, they can be a bit hard to find at first glance.
+
+![Maru the cat wearing a toy hat and hiding in a box while Hana the kitten walks by without noticing](./gifs/maru_hiding_box.gif)
+
+So let's open up our example file and dig into the data ourselves.  You'll find an example OSMPBF file in [./examples/](./examples), so feel free to follow along as you read.
+
 ## Examining a OSMPBF, Byte-by-Byte
 
 When you first try to work with a binary file, it might seem beyond comprehension.
@@ -391,3 +399,10 @@ PrimitiveBlocks still don't store our data, but they store a lot of metadata abo
 All map data entities are held in a PrimitiveGroup.  A PrimitiveGroup has specified repeating (array) fields for Nodes, DenseNodes, Ways, and Relations, and as such *can* hold all of these.  In practice, however, a PrimitiveGroup will only hold *one* type of data.  Each of the repeating fields are optional, and as such can be omitted if they're not needed.
 
 We can see in our PrimitiveBlock diagram examples of PrimitiveGroups.  One contains a series of Nodes, and the other contains a series of Ways.
+
+
+### Ways, Nodes, and Relations
+
+Finally, we have actual map-related data to work with!
+
+![An excited child holding a wrapped present](./gifs/excited_gift.gif)
