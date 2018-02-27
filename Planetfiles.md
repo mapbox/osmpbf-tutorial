@@ -372,3 +372,22 @@ The important thing to note is the nesting of the data structure.
 
 Here we have a Blob, which contains compressed data representing a Message, which itself contains Messages.  Once we're done decompressing the data, the ProtocolBuffer library will handle all of the nested Messages for us when we unmarshal each block of data.
 
+## OSMData
+
+Now that we understand how data is organized within a file, and we've decoded an example OSMHeader blob, let's dig into the mainstay of this format: OSMData blobs.
+
+Every OSMPBF file contains one OSMHeader blob as its first blob, followed entirely by OSMData blobs.
+
+Remember the nesting?  Good, because OSMData blobs are nested pretty deeply.
+
+### PrimitiveBlock
+
+PrimitiveBlocks still don't store our data, but they store a lot of metadata about the data they contain, along with a repeating field (array) of PrimitveGroups.
+
+![PrimitiveBlock](./i/primitive_block.gif)
+
+### PrimitiveGroup
+
+All map data entities are held in a PrimitiveGroup.  A PrimitiveGroup has specified repeating (array) fields for Nodes, DenseNodes, Ways, and Relations, and as such *can* hold all of these.  In practice, however, a PrimitiveGroup will only hold *one* type of data.  Each of the repeating fields are optional, and as such can be omitted if they're not needed.
+
+We can see in our PrimitiveBlock diagram examples of PrimitiveGroups.  One contains a series of Nodes, and the other contains a series of Ways.
