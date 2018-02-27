@@ -128,7 +128,7 @@ Varints allow us to store *any number* we choose, without reserving bytes that w
 
 If the first bit of the byte (MSB) is one, we need to look at the next byte.  If it's zero, we have all the bytes we need to process the number.
 
-If we look at our next byte, `xB0`, in binary, we can see that the first bit is set to 1.
+If we look at our next byte, `xB0`, in binary (10110000), we can see that the first bit is set to 1.
 
 ![xB0 = 10110000](./i/xb0_msb.gif)
 
