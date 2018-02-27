@@ -22,7 +22,15 @@ This makes things easier, but it's still a lot to take in.  To help, I've made a
 
 Note that I didn't do anything particularly special to figure out what each of these bytes mean.  I simply read through the [PBF Format](https://wiki.openstreetmap.org/wiki/PBF_Format) article on the OpenStreetMap wiki, and played around with some [code that uses it at a low level](https://github.com/qedus/osmpbf).
 
-Don't worry if you don't have time to read through this yourself! We'll go through each part through the course of this article.
+Don't worry if you don't have time to read through all that documentation yourself! We'll go through each part through the course of this article.
+
+For these exercises we'll be looking at a [Geofabrik](http://download.geofabrik.de/north-america/us/district-of-columbia.html) regional extract of the District of Columbia.  You can find it in the examples directory.
+
+To look at its byte values on your computer, try typing:
+
+`xxd ./examples/district-of-columbia.osm.pbf` you might want to add `| more` to the end of of your command to only show you one screen's worth of bytes at a time.
+
+We'll be using `xxd` a little bit to explore the file, but I've also created a diagram to look at.
 
 ![](./i/diagram_file_header.gif)
 
@@ -44,7 +52,7 @@ We can use `xxd -l` to specify the length that we want to look at.
 
 Let's use that to look at the first four bytes, which represent the size of the next block of data.
 
-> xxd -l 4 data/pbfs/district-of-columbia-latest.osm.pbf
+> xxd -l 4 ./examples/district-of-columbia.osm.pbf
 
 ```
 00000000: 0000 000e                                ....
@@ -64,7 +72,7 @@ Again, we can take a look at it using xxd, which also has a `-seek` option to sp
 
 ### BlobHeader
 
-> xxd -l 14 -seek 4 data/pbfs/district-of-columbia-latest.osm.pbf
+> xxd -l 14 -seek 4 ./examples/district-of-columbia.osm.pbf
 
 ```
 00000004: 0a09 4f53 4d48 6561 6465 7218 b001       ..OSMHeader...
@@ -154,7 +162,7 @@ Phew, that's a lot of work!
 
 But now we can see that this line from our xxd output...
 
-> xxd -l 14 -seek 4 data/pbfs/district-of-columbia-latest.osm.pbf
+> xxd -l 14 -seek 4 ./examples/district-of-columbia.osm.pbf
 
 ```
 00000004: 0a09 4f53 4d48 6561 6465 7218 b001       ..OSMHeader...
@@ -170,7 +178,7 @@ Let's take a look!
 
 ### Blob
 
-> xxd -l 176 -seek 18 data/pbfs/district-of-columbia-latest.osm.pbf
+> xxd -l 176 -seek 18 ./examples/district-of-columbia.osm.pbf
 
 ```
 00000012: 10a1 011a aa01 789c e392 e1d8 7f6b d7e9  ......x......k..
@@ -246,7 +254,7 @@ Now we can take a look at the next blob, which should look familiar by now.
 
 We'll start at byte address 194, since we've already read the first 194 bytes.
 
-> xxd -l 4 -seek 194 ./data/pbfs/district-of-columbia-latest.osm.pbf
+> xxd -l 4 -seek 194 ./examples/district-of-columbia.osm.pbf
 
 ```
 000000c2: 0000 000d
