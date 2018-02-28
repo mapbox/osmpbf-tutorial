@@ -568,7 +568,7 @@ Let's start digging back into bytes.  I've dumped a sample of each type of Messa
 
 ![A dog digging in the dirt.](./gifs/dog_digging.gif)
 
-#### PrimitiveGroup
+#### PrimitiveBlock
 
 Let's check out the start of the raw data of a PrimitiveBlock.  It's quite large, so let's just start with 43 bytes.
 
@@ -631,4 +631,157 @@ Next up is another `x0a`, followed by a length of `x0e` (14 in decimal), followe
 Next up we have our faithful and familiar friend, `x0a`, followed by a length delimiter of `x03`, followed by `x79 x65 x73`, which in ASCII decodes to the string "yes".
 
 By now, you should have a strong grasp of the StringTable message type, and so we'll leave decoding the rest of its 2,169 bytes as an exercise for the reader.
+
+If PrimitiveBlock were a JSON object, so far we would have decoded:
+
+```
+{stringtable: ["", "jaakkoh", "GidonW", "curve_geometry", "yes"]}
+```
+
+Only in 43 bytes instead of 66!
+
+Really, though, the difference between the StringTable in PBF format and its correspondent JSON array isn't that much; we can leave the spaces out and still have valid JSON, and we're taking two bytes per string to specify its length.  Assuming most of our strings are 127 (in binary 1111111) characters or less, and so have lengths that can fit in one varint byte, we'll save one byte per string versus an ASCII/JSON representation, since we use two bytes (fieldwire byte and length byte) for each PBF string, and three bytes (`"",`) for each JSON string.
+
+#### PrimitiveGroup
+
+Skipping the rest of the stringtable field, we're not at byte 2172 (2169 + the three bytes at the start of the PrimitiveBlock that preceded it).
+
+Let's take peek at the first 16 of bytes.
+
+> xxd -s 2172 -l 16 ./examples/primitive_block.bin
+
+```
+0000087c: 12e0 e207 12dc e207 0a9c 40e0 a722 04aa  ..........@.."..
+```
+
+Sadly, no `x0a`, but we knew this was going to happen.  The next fieldwire byte of PrimitiveBlock *can't* be `x0a` because we've already parsed the only field with a number of one in this message type.
+
+Don't worry, though, just remember how we've decoded all our other fieldwire bytes.
+
+![](./i/12_fieldwire.gif)
+
+`x12` is just `00010 010` in binary, or a field number of *two* with our familiar, faithful wiretype of 2.  If you continue on your PBF journey, you may get to know `x12` almost as well as you know `x0a`.
+
+Looking at the Message definition for PrimitiveBlock, we can see that it's a PrimitiveGroup.
+
+```
+repeated PrimitiveGroup primitivegroup = 2;
+```
+
+A repeating field of another Message type, huh?  Sounds familiar.
+
+The next three bytes are a varint that tells us the data for this field is going to be 127,324 bytes long.
+
+What's the first byte of the data?  `x12`, our new favorite fieldwire byte.  Since we know this a PrimitiveGroup, we can look at its [OSMPBF definition](https://github.com/scrosby/OSM-binary/blob/master/src/osmformat.proto#L116) to figure out what kind of field it is.
+
+```
+optional DenseNodes dense = 2;
+```
+
+We're about to get DenseNodes.
+
+#### DenseNodes
+
+DenseNodes are like normal Nodes, just more compact.  Since most of our map data is Nodes, this saves a whole lot of space.  Which is good, because a full dump in OSMPBF format is around 40GB at the moment.
+
+So now we know that next up is a DenseNodes message of 127,324 bytes.
+
+Let's take a look at the entire [OSMPBF specification](https://github.com/scrosby/OSM-binary/blob/master/src/osmformat.proto#L216) for DenseNodes, because they're a bit tricky.
+
+```
+message DenseNodes {
+   repeated sint64 id = 1 [packed = true]; // DELTA coded
+   optional DenseInfo denseinfo = 5;
+   repeated sint64 lat = 8 [packed = true]; // DELTA coded
+   repeated sint64 lon = 9 [packed = true]; // DELTA coded
+   repeated int32 keys_vals = 10 [packed = true]; 
+}
+```
+
+It's probably easiest to think about this like a CSV.
+
+If we wanted to store id, lat, and lon as JSON, we'd get something like...
+
+```
+[{"id":1, "lat": 2, "lon": 3}, {"id": 2, "lat": 3, "lon": 4}, {"id": 3, "lat": 4, "lon": 5}]
+```
+
+...and so forth.
+
+If we wanted to store the same information as a CSV file ([Comma-separated values](https://en.wikipedia.org/wiki/Comma-separated_values)), it would look like this...
+
+```
+id,lat,lon
+1,2,3
+2,3,4
+3,4,5
+```
+
+Where the first row is the column names, and the rest are individual nodes.
+
+Which is much smaller, but takes a bit more work to put the data back together.
+
+In the same way, in JSON, a DenseNode would look something like this:
+
+```
+{"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]}
+```
+
+The difference from this and CSV is that, instead of collecting the data by *row*, it does it by *column*.
+
+The transition between the two data types could be expressed like this (in JavaScript):
+
+```
+var denseNode = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
+
+var node0 = {"id": denseNode.id[0], "lat": denseNode.lat[0], "lon": denseNode.lon[0]};
+var node1 = {"id": denseNode.id[1], "lat": denseNode.lat[1], "lon": denseNode.lon[1]};
+var node2 = {"id": denseNode.id[2], "lat": denseNode.lat[2], "lon": denseNode.lon[2]};
+```
+
+Remember our StringsTable?  This is exactly like that, except a little bit different.  (Note that [[packed = true](https://developers.google.com/protocol-buffers/docs/encoding#packed).)
+
+![](./i/primitive_group_densenodes.gif)
+
+We start normally with `x0a`, just like in our StringTable.  Then we decode the following varint, `x9c x40` to get... if you're following along at home, you might think the answer is 8,220.  You would be wrong.  It's actually 4,110.
+
+To figure out why, check the PrimitiveGroup specification again.  *sint* is different than *int*.  It's a *signed integer*, meaning it can have a negative value, which takes an extra bit to store.  So far, the varints we've seen as length delimiters have been *unsigned*, since there's no reason to ever say "the last five bits were a string" in a way that makes sense to the protobuf library.
+
+So, as a signed int, we have our first ID: 4110.
+
+ but after our first varint, we get `xe0`.  Not only is `xe0` nothing like our friends `x0a` and `x12`, if we tried to decode it as a fieldwire byte we'd get a field number of 28, which doesn't exist!
+
+![Mal Reynolds from Firefly struggling to find words.](./gifs/speechless.gif)
+
+This is because we don't need a fieldwire byte after every varint.  We already know that a varint ends at the byte without an MSB of zero.  Which means we can start the next varint immediately after the first with no byte in between them to tell us what we already know.
+
+`[packed = true]` is the way we can specify that this is what we want.
+
+That means that `x0e` is the start byte of our *next* varint.  Decoding `x0e` and the next bytes until we get an MSB of 0, we get 281072.
+
+So our next ID is 281072, right?
+
+Nope.  It's 4110 + 281072.
+
+##### Delta-Encoding
+
+The IDs are also *delta encoded*, meaning that they're the difference (delta) between the previous ID and the current one.  Adding delta-encoding to our previous example, to get the actual database IDs of each node, we'd get...
+
+```
+var denseNode = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
+
+var node0 = {"id": denseNode.id[0], "lat": denseNode.lat[0], "lon": denseNode.lon[0]};
+var node1 = {
+	"id":  node0.id  + denseNode.id[1],
+	"lat": node0.lat + denseNode.lat[1],
+	"lon": node0.lon + denseNode.lon[1]
+};
+var node2 = {
+	"id":  node1.id  + denseNode.id[2],
+	"lat": node1.lat + denseNode.lat[2],
+	"lon": node1.lon + denseNode.lon[2]
+};
+```
+
+Since there are millions of IDs in the database, a number which would take several varint bytes to represent, this ends up saving us a lot of space, since the full ID only has to be stored for the first node in the group.  The rest of the IDs can be represented with as little as one byte, assuming they're consequtive (or close to it).
 
