@@ -404,19 +404,19 @@ All map data entities are held in a PrimitiveGroup.  A PrimitiveGroup has specif
 
 We can see in our PrimitiveBlock diagram examples of PrimitiveGroups.  One contains a series of Nodes, and the other contains a series of Ways.
 
-### Ways, Nodes, and Relations
+### APIDB Schema
 
 Finally, we have actual map-related data to work with!
 
 ![An excited child holding a wrapped present](./gifs/excited_gift.gif)
 
-For reference, here's the database schema relevant to these three models from the [Rails Port (APIDB) schema](https://chrisnatali.github.io/osm_notes/osm_schema.html).
+It might help to see the data in a more accessible form, so I'm going to grab the APIDB schema for us to look at while we're looking at their PBF counterparts. For reference, here's the database schema relevant to these three models from the [Rails Port (APIDB) schema](https://chrisnatali.github.io/osm_notes/osm_schema.html).
 
 ![Rails APIDB database schema diagram.](./i/rails_schema.gif)
 
 We can also take a look at the [Rails Port SQL structure](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql) directly to see how the data relates.
 
-#### Nodes and DenseNodes
+#### Nodes
 
 Let's look at some of the CREATE TABLE statements for [nodes](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql#L752) and [node_tags](https://github.com/openstreetmap/openstreetmap-website/blob/master/db/structure.sql#L740) to see what sort of data we can expect to get back eventually.
 
@@ -443,7 +443,7 @@ CREATE TABLE node_tags (
 );
 ```
 
-We should be able to get all of this from the [OSMPBF Protobuf Specification for Nodes](https://github.com/brettch/OSM-binary/blob/master/src/osmformat.proto#L192).
+We should be able to get most of this from the [OSMPBF Protobuf Specification for Nodes](https://github.com/brettch/OSM-binary/blob/master/src/osmformat.proto#L192).
 
 ```
 message Node {
@@ -458,6 +458,8 @@ message Node {
    required sint64 lon = 9;
 }
 ```
+
+There are also DenseNodes, but let's not worry about that right now.  They'll be simpler once we've properly groked normal Node messages.
 
 #### Ways
 
@@ -557,4 +559,76 @@ message Relation {
    repeated MemberType types = 10 [packed = true];
 }
 ```
+
+### Back to Bytes
+
+Remember how we have the `unmarshal` function to take the raw bytes of a PBF Message and convert them into data we can work with?  Well, once we have data, we can `marshal` the Message to get bytes back!
+
+Let's start digging back into bytes.  I've dumped a sample of each type of Message's raw binary format into the examples directory.
+
+![A dog digging in the dirt.](./gifs/dog_digging.gif)
+
+#### PrimitiveGroup
+
+Let's check out the start of the raw data of a PrimitiveBlock.  It's quite large, so let's just start with 43 bytes.
+
+> xxd -l 43 ./examples/primitive_block.bin
+
+```
+00000000: 0af9 100a 000a 076a 6161 6b6b 6f68 0a06  .......jaakkoh..
+00000010: 4769 646f 6e57 0a0e 6375 7276 655f 6765  GidonW..curve_ge
+00000020: 6f6d 6574 7279 0a03 7965 73              ometry..yes
+```
+
+That's a whole lot of valid ASCII characters!  Here're those bytes diagrammed.
+
+![](./i/primitive_block_stringtable.gif)
+
+Remember that byte we've seen before, `x0A`?  We've already decoded it twice; and here it is again.
+
+![x0A = 00001010](./i/0a_fieldwire.gif)
+
+Another field number of 1 with a wire type of 2.  The wire type is always the same, *length delimited*, but since we're looking at a new Message type, the field number corresponds to a new field.
+
+Let's check the [OSMPBF definition for PrimitiveBlock](https://github.com/scrosby/OSM-binary/blob/master/src/osmformat.proto#L97).
+
+```
+required StringTable stringtable = 1;
+```
+
+Looks like we're caught a glimpse of the elusive StringTable!
+
+Remember that one time when we looked at our BlobHeader and we saw that `x0A` byte and it gave us a length-delimited block of bytes representing another Message (HeaderBBox)?
+
+This is like that time.
+
+`x0a xf9 x10` is telling us that we've got a StringTable coming up that's 2,169 bytes long.
+
+The StringTable is pretty easy to read, it only has one field type.
+
+```
+message StringTable {
+   repeated string s = 1;
+}
+```
+
+And if we look at the first byte of the embedded StringTable, we get... `x0a`!  Again.
+
+By this point, we've seen `x0a` enough times to warmly greet it as a familiar colleague, if not a friend.  As always, `x0a` is telling us that we're getting a length-delimited wiretype with a field number of 1.  In this case, the field is just called "s", and it's made up of strings (which are really just length-delimited byte arrays that happen to fall into the ASCII range).
+
+That means the next byte, `x00` is the start (and end) of a varint block!  `x00` happens to be the easiest varint to decode.  It's one byte because the MSB of 0 is always zero, and comes out to 0 in binary and 0 in decimal.
+
+So the first string in our StringTable (`x0a x00`) is "", or an empty string.
+
+Then we get (`x0a`) again, our new best friend.  This is because it's a *repeating field*, meaning we'll get the same field number and wiretype over and over again until we're done processing all the values.
+
+In this case, `x0a x07` tells us that the next string in our table is going to be seven bytes long.  Taking the next seven bytes and decoding them as ASCII characters, we can see that the second string in our StringTable is "jaakkoh".  What "jaakkoh" means is left as [a mystery for the reader to ponder](https://wiki.openstreetmap.org/wiki/User:JaakkoH).  All we need to know right now is that, for all the data Messages in this PrimitiveBlock, when we see `x01` in our key/val repeating fields, it means "jaakkoh", because the second string (zero indexed) of our StringTable says "jaakkoh".
+
+Going through the next item in our StringTable, we get `x0a` (field number 1, length-delimited wiretype), followed by a `x06` (6) byte length delimiter, followed by the six bytes `x47 x69 x64 x6f x6e x57`, which in ASCII represent "GidonW".  What does this string mean?  Again, that's a [mystery](https://www.openstreetmap.org/user/GidonW) beyond the scope of this document.
+
+Next up is another `x0a`, followed by a length of `x0e` (14 in decimal), followed by a string of 14 bytes, `x63 x75 x72 x76 x65 x5f x67 x65 x6f x6d x65 x74 x72 x79`.  Decoded into ASCII, this gives us, "curve_geometry" which is, again, another [great mystery](https://lists.openstreetmap.org/pipermail/talk-us/2016-March/015975.html).
+
+Next up we have our faithful and familiar friend, `x0a`, followed by a length delimiter of `x03`, followed by `x79 x65 x73`, which in ASCII decodes to the string "yes".
+
+By now, you should have a strong grasp of the StringTable message type, and so we'll leave decoding the rest of its 2,169 bytes as an exercise for the reader.
 
