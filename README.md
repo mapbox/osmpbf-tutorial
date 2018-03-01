@@ -759,17 +759,27 @@ We start normally with `x0a`, just like in our StringTable.  Then we decode the 
 
 After our first varint, we get `xe0`.  Not only is `xe0` nothing like our friends `x0a` and `x12`, if we tried to decode it as a fieldwire byte we'd get a field number of 28, which doesn't even exist in the DenseNodes definition!
 
-![Mal Reynolds from Firefly struggling to find words.](./gifs/speechless.gif)
+![Princess Bubblegum is so angry that she didn't find x0a next that she flips a table.](./gifs/pb_table.gif)
 
-This is because we don't need a fieldwire byte after every varint.  We already know that a varint ends at the byte without an MSB of zero.  Which means we can start the next varint immediately after the first with no byte in between them to tell us what we already know.
+Don't worry!  Everything is fine.
+
+##### Packed Repeating Fields
+
+We don't need a fieldwire byte after every varint.  We already know that a varint ends at the byte without an MSB of zero.  Which means we can start the next varint immediately after the first with no byte in between them to tell us what we already know.
+
+See that `[packed = true]` in the DenseNodes definition?  This is called a packed field.
 
 The first varint stores the size of all our of numbers as a single payload, followed by a whole bunch of varints with nothing in between them.  We know when we've reached each new varint when we reach the end of one with an MSB of 0.  We'll know we're done processing all of the varints when we reach the end of the alotted payload bytes.
 
-`[packed = true]` is the way we can specify that this is what we want.
+`x0e` is the start byte of our *next* varint.  Decoding this and the next set of bytes until we get an MSB of 0, we get `xe0 xa7 x22`.  Do you remember how to decode a varint?  Try to guess this one's value.
 
-That means that `x0e` is the start byte of our *next* varint.  Decoding `x0e` and the next bytes until we get an MSB of 0, we get 562144.
+Did you guess 562144?  Good!  That's correct.
 
-Actually, no.  We get 281072.
+But also wrong.
+
+![Mal Reynolds from Firefly struggling to find words.](./gifs/speechless.gif)
+
+It's actually 281072.
 
 To figure out why, check the PrimitiveGroup specification again.  *sint* is different than *int*.  It's a *signed integer*, meaning it can have a negative value, which takes an extra bit to store.  So far, the varints we've seen as length delimiters have been *unsigned*, since there's no reason to ever say "the last five bits were a string" in a way that makes sense to the protobuf library.
 
