@@ -763,7 +763,7 @@ After our first varint, we get `xe0`.  Not only is `xe0` nothing like our friend
 
 This is because we don't need a fieldwire byte after every varint.  We already know that a varint ends at the byte without an MSB of zero.  Which means we can start the next varint immediately after the first with no byte in between them to tell us what we already know.
 
-The first varint stores the size of all our of numbers as a single payload, followed by a whole bunch of varints with nothing in between them.  We know when we've reached the each new varint when we end one with an MSB of 0.  We'll know we're done processing all of the varints when we reach the end of the payload bytes.
+The first varint stores the size of all our of numbers as a single payload, followed by a whole bunch of varints with nothing in between them.  We know when we've reached each new varint when we reach the end of one with an MSB of 0.  We'll know we're done processing all of the varints when we reach the end of the alotted payload bytes.
 
 `[packed = true]` is the way we can specify that this is what we want.
 
@@ -781,7 +781,7 @@ Our next ID must be 4!  Again, though, this would be wrong.  Our next ID is actu
 
 ##### Delta-Encoding
 
-The IDs are also *delta encoded*, meaning that they're the difference (delta) between the previous ID and the current one.  Adding delta-encoding to our previous example, to get the actual database IDs of each node, we'd get...
+The IDs, lats, and lons are also *delta encoded* (see the comments in the DenseNodes definition), meaning that they're the difference (delta) between the previous ID and the current one.  Adding delta-encoding to our previous example, to get the actual database IDs of each node, we'd get...
 
 ```
 var denseNodes = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
