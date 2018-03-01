@@ -655,7 +655,7 @@ Let's take peek at the first 16 of bytes.
 0000088c: 6bea fba0 1c02 0202 0202 f694 1202 0214  k...............
 ```
 
-![](./i/primitive_group_densenodes.gif)
+![](./i/bytes_2172.gif)
 
 Sadly, no `x0a`, but we knew this was going to happen.  The next fieldwire byte of PrimitiveBlock *can't* be `x0a` because we've already parsed the only field with a number of one in this message type.
 
@@ -819,3 +819,8 @@ Alright!  We're now able to decode all the IDs in a packed DenseNodes Message.
 I hope you're feeling good about yourself right now; you've come a long way!
 
 ![Arguably the best dance sequence of the 1988 Crystal Light National Aerobic Championship Opening](./gifs/dance.gif)
+
+Let's take all of what we've learned from that exercise and bring it with us to lat/lon decoding.
+
+##### Lat/Lon Fields
+
