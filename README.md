@@ -657,7 +657,7 @@ Let's take peek at the first 16 of bytes.
 
 ![](./i/bytes_2172.gif)
 
-Sadly, no `x0a`, but we knew this was going to happen.  The next fieldwire byte of PrimitiveBlock *can't* be `x0a` because we've already parsed the only field with a number of one in this message type.
+Sadly, our first byte isn't `x0a`, but we knew this was going to happen.  The next fieldwire byte of PrimitiveBlock *can't* be `x0a` because we've already parsed the only field with a number of one in this message type.
 
 Don't worry, though, just remember how we've decoded all our other fieldwire bytes.
 
@@ -756,7 +756,7 @@ var node2 = {
 
 Remember our StringsTable?  This is exactly like that, except a little bit different.  (Note that \[[packed = true](https://developers.google.com/protocol-buffers/docs/encoding#packed), which we'll come back to in a moment.)
 
-We start normally with `x0a`, just like in our StringTable.  Then we decode the following varint, `x9c x40` to get 8,220.
+We start normally with `x0a`, just like in our StringTable.  This is because it's a field number of one, which in a DenseNodes Message corresponds to the `id` fiend. Then we decode the following varint, `x9c x40` to get 4,110.  So the length of our repeating field is going to be 4,110 bytes.
 
 After our first varint, we get `xe0`.  Not only is `xe0` nothing like our friends `x0a` and `x12`, if we tried to decode it as a fieldwire byte we'd get a field number of 28, which doesn't even exist in the DenseNodes definition!
 
