@@ -814,11 +814,81 @@ Since there are millions of IDs in the database, a number which would take sever
 
 We can see this in the diagram, as some of the IDs encoded in this way are so efficient that it's hard to fit them into the space for their designated bytes.
 
+We can see this if we take a peek at some of the bytes from the middle of this field.
+
+> xxd -s 2240 -l 128 ./examples/primitive_block.bin
+
+```
+000008c0: 6ca4 050e b002 fe1c 9004 0402 0402 0402  l...............
+000008d0: 0206 0404 0402 0402 0202 0402 0404 0602  ................
+000008e0: 0404 0204 0404 0202 0204 0202 0204 0202  ................
+000008f0: 0402 0402 0204 0404 0404 0202 0202 0202  ................
+00000900: 0404 0404 0202 0404 0404 0402 0202 0402  ................
+00000910: 0604 0404 0204 0204 0202 0202 0404 0404  ................
+00000920: 0204 0404 fe05 ce1a 32fa 0204 0202 0406  ........2.......
+00000930: 0204 0604 0604 0602 c05d 0202 04f6 0dc0  .........]......
+```
+
+Look at all those one-byte IDs!
+
 Alright!  We're now able to decode all the IDs in a packed DenseNodes Message.
 
 I hope you're feeling good about yourself right now; you've come a long way!
 
 ![Arguably the best dance sequence of the 1988 Crystal Light National Aerobic Championship Opening](./gifs/dance.gif)
+
+If we zoom straight past the rest of the id field, we're at byte 6290.  That's byte 2172 where our PrimitiveGroup started, plus the 11 bytes we decoded to get the length of the ID field, plus that 8220 byte length.
+
+That's the cool thing about going byte-by-byte through binary files.  We can skip entire segments when we don't care about them at the moment.
+
+Let's take a look at what's next.  We can reach the end of our id field by taking the byte position of the start of our repeating varints 2183, then adding the length value preciding it, 8220.  This gives us a byte position for the next field of 10403.
+
+If we're not sure we counted right, we can look back a few bytes before that position to see if it still looks like a repeating delta group.
+
+
+> xxd -s 10403 -l 128 ./examples/primitive_block.bin
+
+```
+000028a3: 2ae9 d704 0ac0 3e02 0207 0303 0303 0303  *.....>.........
+000028b3: 0504 0402 0202 0304 0502 0705 0608 0402  ................
+000028c3: 0303 0602 0203 0202 0203 0303 0204 0404  ................
+000028d3: 0404 0404 0404 0303 0404 0404 0404 0404  ................
+000028e3: 0404 0404 0404 0404 0404 0404 0404 0404  ................
+000028f3: 0404 0404 0404 0404 0304 0404 0404 0404  ................
+00002903: 0404 0404 0404 0404 0404 0404 0504 0404  ................
+00002913: 0404 0404 0404 0404 0404 0404 0505 0404  ................
+```
+
+We get `x2a` as our next fieldwire byte; that's a field number of 5 and a wiretype of 2, length-delimited.
+
+Looking up our DenseNodes Message definition, we can see that it's a DenseInfo field.
+
+```
+DenseInfo denseinfo = 5;
+```
+
+But I'm trying to teach you how to get ID, lat and lon!
+
+If only we could just skip this field entirely.
+
+![Rudy from Misfits opens a door, sees cheerleaders, and closes it again.](./gifs/door_close.gif)
+
+Thankfully, there is!  The next three bytes, `xe9 xd7 x04` tell us that the length of this field is 76,777 bytes.
+
+We'll take our last start position, add the four bytes we just decoded, and then sail straight on for 76,777 bytes.
+
+> xxd -s 87184 -l 128 ./examples/primitive_block.bin
+
+```
+00015490: 42e7 8001 b28c a9f3 029c 8101 81c5 49aa  B.............I.
+000154a0: a06c b581 01b9 6fa5 6aa9 78b1 41b9 ca5e  .l....o.j.x.A..^
+000154b0: f789 0115 a3ce 0220 b79d 02cc 900c bee7  ....... ........
+000154c0: 478d d10b d8f6 3a81 9722 a089 25c6 50d4  G.....:.."..%.P.
+000154d0: 1ebf cb0a b0e8 0af1 a416 bcf6 25db e92f  ............%../
+000154e0: e64d b4fd 02a8 811a 9340 8f3f cf0f f43f  .M.......@.?...?
+000154f0: 94fb 11b2 4789 9736 e7ab 12d6 9647 f718  ....G..6.....G..
+00015500: d722 f120 9107 e602 f809 f407 970b 8b01  .". ............
+```
 
 Let's take all of what we've learned from that exercise and bring it with us to lat/lon decoding.
 
