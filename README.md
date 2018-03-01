@@ -648,11 +648,14 @@ Skipping the rest of the stringtable field, we're not at byte 2172 (2169 + the t
 
 Let's take peek at the first 16 of bytes.
 
-> xxd -s 2172 -l 16 ./examples/primitive_block.bin
+> xxd -s 2172 -l 32 ./examples/primitive_block.bin
 
 ```
 0000087c: 12e0 e207 12dc e207 0a9c 40e0 a722 04aa  ..........@.."..
+0000088c: 6bea fba0 1c02 0202 0202 f694 1202 0214  k...............
 ```
+
+![](./i/primitive_group_densenodes.gif)
 
 Sadly, no `x0a`, but we knew this was going to happen.  The next fieldwire byte of PrimitiveBlock *can't* be `x0a` because we've already parsed the only field with a number of one in this message type.
 
@@ -751,9 +754,7 @@ var node2 = {
 };
 ```
 
-Remember our StringsTable?  This is exactly like that, except a little bit different.  (Note that [[packed = true](https://developers.google.com/protocol-buffers/docs/encoding#packed).)
-
-![](./i/primitive_group_densenodes.gif)
+Remember our StringsTable?  This is exactly like that, except a little bit different.  (Note that \[[packed = true](https://developers.google.com/protocol-buffers/docs/encoding#packed), which we'll come back to in a moment.)
 
 We start normally with `x0a`, just like in our StringTable.  Then we decode the following varint, `x9c x40` to get 8,220.
 
