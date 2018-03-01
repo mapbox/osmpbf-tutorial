@@ -989,8 +989,8 @@ If we go back to that little JavaScript example we used earlier, we're finally a
 ```
 var denseNodes = {
 	"id":  [281072, 4, 6869],
-	"lat": [2, 3, 4],
-	"lon": [3, 4, 5]
+	"lat": [389358361, 8270, -602433],
+	"lon": [-771082557, 16, 517814]
 };
 
 var node0 = {
@@ -999,16 +999,14 @@ var node0 = {
 	"lon": denseNodes.lon[0]
 };
 var node1 = {
-	"id":  denseNodes.id[1],
-	"lat": denseNodes.lat[1],
-	"lon": denseNodes.lon[1]
+	"id":  node0.id  + denseNodes.id[1],
+	"lat": node0.lat + denseNodes.lat[1],
+	"lon": node0.lon + denseNodes.lon[1]
 };
 var node2 = {
-	"id":  denseNodes.id[2],
-	"lat": denseNodes.lat[2],
-	"lon": denseNodes.lon[2]
+	"id":  node1.id  + denseNodes.id[2],
+	"lat": node1.lat + denseNodes.lat[2],
+	"lon": node1.lon + denseNodes.lon[2]
 };
 ```
-
-I hope you're proud of yourself!  Did you notice I stopped diagramming every byte?  You didn't need them anymore; you have `xxd` and that's enough.
 
