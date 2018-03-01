@@ -673,15 +673,15 @@ repeated PrimitiveGroup primitivegroup = 2;
 
 A repeating field of another Message type, huh?  Sounds familiar.
 
-The next three bytes are a varint that tells us the data for this field is going to be 127,324 bytes long.
-
-What's the first byte of the data?  `x12`, our new favorite fieldwire byte.  Since we know this a PrimitiveGroup, we can look at its [OSMPBF definition](https://github.com/scrosby/OSM-binary/blob/master/src/osmformat.proto#L116) to figure out what kind of field it is.
+What's the first byte of the data?  `x12`, our new friend.  Since we know this a PrimitiveGroup, we can look at its [OSMPBF definition](https://github.com/scrosby/OSM-binary/blob/master/src/osmformat.proto#L116) to figure out what kind of field it is.
 
 ```
 optional DenseNodes dense = 2;
 ```
 
 We're about to get DenseNodes.
+
+The next three bytes are a varint that tells us the data for this group is going to be 127,328 bytes long.  Next up we get another `x12`, because it's a repeating field, followed by the length of the *first* item, 127,324.  Looks like it's the only item, as well.
 
 #### DenseNodes
 
