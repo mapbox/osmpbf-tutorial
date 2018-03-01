@@ -814,3 +814,8 @@ Since there are millions of IDs in the database, a number which would take sever
 
 We can see this in the diagram, as some of the IDs encoded in this way are so efficient that it's hard to fit them into the space for their designated bytes.
 
+Alright!  We're now able to decode all the IDs in a packed DenseNodes Message.
+
+I hope you're feeling good about yourself right now; you've come a long way!
+
+![Arguably the best dance sequence of the 1988 Crystal Light National Aerobic Championship Opening](./gifs/dance.gif)
