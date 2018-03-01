@@ -646,6 +646,10 @@ Really, though, the difference between the StringTable in PBF format and its cor
 
 Skipping the rest of the stringtable field, we're not at byte 2172 (2169 + the three bytes at the start of the PrimitiveBlock that preceded it).
 
+![](./i/bytes_2172.gif)
+
+You'll notice a lot of gaps in this diagram.  Don't worry; we'll just be skipping these as they're not interesting to look at once we've decoded the first three values of every field.
+
 Let's take peek at the first 16 of bytes.
 
 > xxd -s 2172 -l 32 ./examples/primitive_block.bin
@@ -654,8 +658,6 @@ Let's take peek at the first 16 of bytes.
 0000087c: 12e0 e207 12dc e207 0a9c 40e0 a722 04aa  ..........@.."..
 0000088c: 6bea fba0 1c02 0202 0202 f694 1202 0214  k...............
 ```
-
-![](./i/bytes_2172.gif)
 
 Sadly, our first byte isn't `x0a`, but we knew this was going to happen.  The next fieldwire byte of PrimitiveBlock *can't* be `x0a` because we've already parsed the only field with a number of one in this message type.
 
@@ -770,6 +772,15 @@ We don't need a fieldwire byte after every varint.  We already know that a varin
 
 See that `[packed = true]` in the DenseNodes definition?  This is called a packed field.
 
+Let's take a look at it, starting with the first byte of the DenseNodes message within our PrimitiveGroup.
+
+> xxd -s 2172 -l 32 ./examples/primitive_block.bin
+
+```
+0000087c: 12e0 e207 12dc e207 0a9c 40e0 a722 04aa  ..........@.."..
+0000088c: 6bea fba0 1c02 0202 0202 f694 1202 0214  k...............
+```
+
 The first varint stores the size of all our of numbers as a single payload, followed by a whole bunch of varints with nothing in between them.  We know when we've reached each new varint when we reach the end of one with an MSB of 0.  We'll know we're done processing all of the varints when we reach the end of the alotted payload bytes.
 
 `x0e` is the start byte of our *next* varint.  Decoding this and the next set of bytes until we get an MSB of 0, we get `xe0 xa7 x22`.  Do you remember how to decode a varint?  Try to guess this one's value.
@@ -811,6 +822,8 @@ var node2 = {
 ```
 
 Since there are millions of IDs in the database, a number which would take several varint bytes to represent, this ends up saving us a lot of space, since the full ID only has to be stored for the first node in the group.  The rest of the IDs can be represented with as little as one byte, assuming they're consequtive (or close to it).
+
+Which means our second ID actually the *previous id* plus 4.  And our third ID comes from the next varint, `
 
 We can see this in the diagram, as some of the IDs encoded in this way are so efficient that it's hard to fit them into the space for their designated bytes.
 
@@ -873,7 +886,7 @@ If only we could just skip this field entirely.
 
 ![Rudy from Misfits opens a door, sees cheerleaders, and closes it again.](./gifs/door_close.gif)
 
-Thankfully, there is!  The next three bytes, `xe9 xd7 x04` tell us that the length of this field is 76,777 bytes.
+Thankfully, we can!  The next three bytes, `xe9 xd7 x04` tell us that the length of this field is 76,777 bytes.
 
 We'll take our last start position, add the four bytes we just decoded, and then sail straight on for 76,777 bytes.
 
@@ -946,4 +959,56 @@ Now that we've got three latitude numbers to go with our three IDs, let's skip s
 0001955b: f316 d899 29cd 8601 e1ec 328f 9d1c 9fef  ....).....2.....
 0001956b: 9b01 e42c 8a2f b02a f824 bc2e ee29 c055  ...,./.*.$...).U
 ```
+
+Woah, that was a lot of bytes to skip!  Did we end up in the right place in our file?
+
+It's easy enough to tell; `x4a` is 01001 010 in binary.  Field number 9, wiretype 2.
+
+From our DenseNodes Message definition:
+
+```
+required sint64 lon = 9; // DELTA coded
+```
+
+Looks like we're in the right place!
+
+![McCoy and Kirk from Star Trek nodding to each other.](./gifs/kirk_nod.gif)
+
+The bytes `xc2 x82 x01` tell us that we've got 16,706 bytes ahead of longitude values.
+
+`0xf9 0xa4 0xae 0xdf 0x05` represent our first value; -771082557.  Remember, they're geocoordinates, so they can be negative.
+
+After that we've got a number just as large, but stored as one byte instead of five.  Look how much space we're saving!  `0x20` = 16, which we'll add to -771082557 to get -771082551.
+
+After that, we get `0xec 0x9a 0x3f`, or 517814.  That means our third lon value is -771082551 + 517814, or -770564737.
+
+#### Putting it All Back Together
+
+If we go back to that little JavaScript example we used earlier, we're finally able to fill in the numbers with *real* values that we found ourselves by digging into raw bytes.
+
+```
+var denseNodes = {
+	"id":  [281072, 4, 6869],
+	"lat": [2, 3, 4],
+	"lon": [3, 4, 5]
+};
+
+var node0 = {
+	"id":  denseNodes.id[0],
+	"lat": denseNodes.lat[0],
+	"lon": denseNodes.lon[0]
+};
+var node1 = {
+	"id":  denseNodes.id[1],
+	"lat": denseNodes.lat[1],
+	"lon": denseNodes.lon[1]
+};
+var node2 = {
+	"id":  denseNodes.id[2],
+	"lat": denseNodes.lat[2],
+	"lon": denseNodes.lon[2]
+};
+```
+
+I hope you're proud of yourself!  Did you notice I stopped diagramming every byte?  You didn't need them anymore; you have `xxd` and that's enough.
 
