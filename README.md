@@ -732,56 +732,74 @@ The difference from this and CSV is that, instead of collecting the data by *row
 The transition between the two data types could be expressed like this (in JavaScript):
 
 ```
-var denseNode = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
+var denseNodes = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
 
-var node0 = {"id": denseNode.id[0], "lat": denseNode.lat[0], "lon": denseNode.lon[0]};
-var node1 = {"id": denseNode.id[1], "lat": denseNode.lat[1], "lon": denseNode.lon[1]};
-var node2 = {"id": denseNode.id[2], "lat": denseNode.lat[2], "lon": denseNode.lon[2]};
+var node0 = {
+	"id":  denseNodes.id[0],
+	"lat": denseNodes.lat[0],
+	"lon": denseNodes.lon[0]
+};
+var node1 = {
+	"id":  denseNodes.id[1],
+	"lat": denseNodes.lat[1],
+	"lon": denseNodes.lon[1]
+};
+var node2 = {
+	"id":  denseNodes.id[2],
+	"lat": denseNodes.lat[2],
+	"lon": denseNodes.lon[2]
+};
 ```
 
 Remember our StringsTable?  This is exactly like that, except a little bit different.  (Note that [[packed = true](https://developers.google.com/protocol-buffers/docs/encoding#packed).)
 
 ![](./i/primitive_group_densenodes.gif)
 
-We start normally with `x0a`, just like in our StringTable.  Then we decode the following varint, `x9c x40` to get... if you're following along at home, you might think the answer is 8,220.  You would be wrong.  It's actually 4,110.
+We start normally with `x0a`, just like in our StringTable.  Then we decode the following varint, `x9c x40` to get 8,220.
 
-To figure out why, check the PrimitiveGroup specification again.  *sint* is different than *int*.  It's a *signed integer*, meaning it can have a negative value, which takes an extra bit to store.  So far, the varints we've seen as length delimiters have been *unsigned*, since there's no reason to ever say "the last five bits were a string" in a way that makes sense to the protobuf library.
-
-So, as a signed int, we have our first ID: 4110.
-
- but after our first varint, we get `xe0`.  Not only is `xe0` nothing like our friends `x0a` and `x12`, if we tried to decode it as a fieldwire byte we'd get a field number of 28, which doesn't exist!
+After our first varint, we get `xe0`.  Not only is `xe0` nothing like our friends `x0a` and `x12`, if we tried to decode it as a fieldwire byte we'd get a field number of 28, which doesn't even exist in the DenseNodes definition!
 
 ![Mal Reynolds from Firefly struggling to find words.](./gifs/speechless.gif)
 
 This is because we don't need a fieldwire byte after every varint.  We already know that a varint ends at the byte without an MSB of zero.  Which means we can start the next varint immediately after the first with no byte in between them to tell us what we already know.
 
+The first varint stores the size of all our of numbers as a single payload, followed by a whole bunch of varints with nothing in between them.  We know when we've reached the each new varint when we end one with an MSB of 0.  We'll know we're done processing all of the varints when we reach the end of the payload bytes.
+
 `[packed = true]` is the way we can specify that this is what we want.
 
-That means that `x0e` is the start byte of our *next* varint.  Decoding `x0e` and the next bytes until we get an MSB of 0, we get 281072.
+That means that `x0e` is the start byte of our *next* varint.  Decoding `x0e` and the next bytes until we get an MSB of 0, we get 562144.
 
-So our next ID is 281072, right?
+Actually, no.  We get 281072.
 
-Nope.  It's 4110 + 281072.
+To figure out why, check the PrimitiveGroup specification again.  *sint* is different than *int*.  It's a *signed integer*, meaning it can have a negative value, which takes an extra bit to store.  So far, the varints we've seen as length delimiters have been *unsigned*, since there's no reason to ever say "the last five bits were a string" in a way that makes sense to the protobuf library.
+
+So, as a signed int, we have our first ID: 281072.
+
+Next up we have a pretty easy byte to decode: `x04`.
+
+Our next ID must be 4!  Again, though, this would be wrong.  Our next ID is actually 281076.
 
 ##### Delta-Encoding
 
 The IDs are also *delta encoded*, meaning that they're the difference (delta) between the previous ID and the current one.  Adding delta-encoding to our previous example, to get the actual database IDs of each node, we'd get...
 
 ```
-var denseNode = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
+var denseNodes = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
 
-var node0 = {"id": denseNode.id[0], "lat": denseNode.lat[0], "lon": denseNode.lon[0]};
+var node0 = {"id": denseNodes.id[0], "lat": denseNodes.lat[0], "lon": denseNodes.lon[0]};
 var node1 = {
-	"id":  node0.id  + denseNode.id[1],
-	"lat": node0.lat + denseNode.lat[1],
-	"lon": node0.lon + denseNode.lon[1]
+	"id":  node0.id  + denseNodes.id[1],
+	"lat": node0.lat + denseNodes.lat[1],
+	"lon": node0.lon + denseNodes.lon[1]
 };
 var node2 = {
-	"id":  node1.id  + denseNode.id[2],
-	"lat": node1.lat + denseNode.lat[2],
-	"lon": node1.lon + denseNode.lon[2]
+	"id":  node1.id  + denseNodes.id[2],
+	"lat": node1.lat + denseNodes.lat[2],
+	"lon": node1.lon + denseNodes.lon[2]
 };
 ```
 
 Since there are millions of IDs in the database, a number which would take several varint bytes to represent, this ends up saving us a lot of space, since the full ID only has to be stored for the first node in the group.  The rest of the IDs can be represented with as little as one byte, assuming they're consequtive (or close to it).
+
+We can see this in the diagram, as some of the IDs encoded in this way are so efficient that it's hard to fit them into the space for their designated bytes.
 
