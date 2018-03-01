@@ -877,6 +877,8 @@ Thankfully, there is!  The next three bytes, `xe9 xd7 x04` tell us that the leng
 
 We'll take our last start position, add the four bytes we just decoded, and then sail straight on for 76,777 bytes.
 
+##### Lat/Lon Fields
+
 > xxd -s 87184 -l 128 ./examples/primitive_block.bin
 
 ```
@@ -890,7 +892,58 @@ We'll take our last start position, add the four bytes we just decoded, and then
 00015500: d722 f120 9107 e602 f809 f407 970b 8b01  .". ............
 ```
 
-Let's take all of what we've learned from that exercise and bring it with us to lat/lon decoding.
+It might feel a bit disorienting to just jump that many bytes in a huge binary file, especially without our friends `x0a` or `x12` to greet us.
 
-##### Lat/Lon Fields
+![John Snow in a desolate landscape stares out at a White Walker.](./gifs/white_walker.gif)
+
+Maybe we did our math wrong; maybe we're not even at the right byte position!  How would we even *know*?
+
+All we have to do is follow the same process we've been following the entire time.
+
+`x42` is is `01000 010` in binary; that's a field number of 8 and our old, familiar wiretype of 2.
+
+You know what else has a field number of 8 and a wiretype of 2?
+
+```
+repeated sint64 lat = 8 [packed = true]; // DELTA coded
+```
+
+Our lat field!
+
+It's the exact same type as our id field, so decoding this should be a breeze.
+
+`xe7 x80 x01` tells us we're dealing with 16,487 bytes of varints.
+
+Decoding our first signed varint, we get 389358361.
+
+What a large number!
+
+![Alan Grant from the movie Jurassic Park sees dinosaurs for the first time and removes his sunglasses in disbelief.](./gifs/sunglass_wow.gif)
+
+Don't worry; it's what we were expecting.  Latitude and longitude are stored as one big number with a specified *granularity*, which is stored in the PrimitiveBlock containing this PrimitiveGroup.  We haven't gotten to that field yet.  The PrimitiveBlock also stores their relative offsets.
+
+So let's just make a note of our number and move on to the next one.
+
+Our next varint, `x9c x91 x01`, decodes as 8270.  Much smaller; remember the delta encoding!
+
+Adding this to the previous lat, we get our second latitude value: 389366631.
+
+For our third, we decode `x81 xc5 x49` and we get -602433.  This means the next value is 389366631 - 602433.  Looks like that sign part of our signed varints is handy after all!
+
+Now that we've got three latitude numbers to go with our three IDs, let's skip straight on to the start of the longitude field.
+
+![A spaceship making a hyperspace warp.](./gifs/hyperspace_warp.gif)
+
+> xxd -s 103675 -l 128 ./examples/primitive_block.bin
+
+```
+000194fb: 4ac2 8201 f9a4 aedf 0520 ec9a 3fda b10b  J........ ..?...
+0001950b: e290 019a 7be8 8a01 be72 de34 d0ee 307c  ....{....r.4..0|
+0001951b: 98c9 01ec da0b b487 0172 fef2 40d5 99cc  .........r..@...
+0001952b: 0197 9a0c eee5 6edb 8f4d f8d0 47f0 418e  ......n..M..G.A.
+0001953b: 1c90 f714 cda4 18cf 933a f28f 25eb e82e  .........:..%...
+0001954b: 8aa7 01c4 da03 b0b3 18eb 67ab 6bc3 22b3  ..........g.k.".
+0001955b: f316 d899 29cd 8601 e1ec 328f 9d1c 9fef  ....).....2.....
+0001956b: 9b01 e42c 8a2f b02a f824 bc2e ee29 c055  ...,./.*.$...).U
+```
 
