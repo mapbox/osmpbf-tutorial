@@ -1215,4 +1215,49 @@ var node1 = {
 };
 ```
 
+Now all we have to do to get our actual, full data is check for the granularity and offsets to the latitude and longitude data.  Let's pass by all the byte segments we've already looked at.
 
+If we start at the first byte of our PrimitiveBlock...
+
+> xxd -l 16 ./examples/primitive_block.bin
+
+```
+00000000: 0af9 100a 000a 076a 6161 6b6b 6f68 0a06  .......jaakkoh..
+```
+
+Swing past our stringtable field `x0a` with a length of `0xf9 0x10` 2169 (+ 3 for each byte we just decoded)...
+
+
+> xxd -s 2172 -l 16 ./examples/primitive_block.bin
+
+```
+0000087c: 12e0 e207 12dc e207 0a9c 40e0 a722 04aa  ..........@.."..
+```
+
+...straight past our denseinfo field (`x12`) and its length of `0xe0 0xe2 0x07` (127328), plus the four bytes we just decoded...
+
+> xxd -s 129504 -l 16 ./examples/primitive_block.bin
+
+We get no output, meaning we've reached the end of our PrimitiveBlock message.
+
+### Granularity and Offsets
+
+We still have to check, though, because there *could* be fields for `granularity`, `lat_offset`,  `lon_offset`, and `date_granularity`.
+
+```
+optional int32 granularity = 17 [default=100]; 
+optional int64 lat_offset = 19 [default=0];
+optional int64 lon_offset = 20 [default=0];
+optional int32 date_granularity = 18 [default=1000]; 
+```
+
+In this case, we use the default values of 100 for granularity and 0 for lat and lon offsets.
+
+Using the default values, we'd have to apply the following equation to each coordinate:
+
+```
+latitude = .000000001 * (lat_offset + (granularity * lat))
+longitude = .000000001 * (lon_offset + (granularity * lon))
+```
+
+Our default date granularity is 1000, meaning the timestamps are stored as milliseconds since January 1, 1970.
