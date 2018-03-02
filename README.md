@@ -806,9 +806,11 @@ Our next ID must be 4!  Again, though, this would be wrong.  Our next ID is actu
 The IDs, lats, and lons are also *delta encoded* (see the comments in the DenseNodes definition), meaning that they're the difference (delta) between the previous ID and the current one.  Adding delta-encoding to our previous example, to get the actual database IDs of each node, we'd get...
 
 ```
-var denseNodes = {"id": [1, 2, 3], "lat": [2, 3, 4], "lon": [3, 4, 5]};
-
-var node0 = {"id": denseNodes.id[0], "lat": denseNodes.lat[0], "lon": denseNodes.lon[0]};
+var node0 = {
+	"id": denseNodes.id[0],
+	"lat": denseNodes.lat[0],
+	"lon": denseNodes.lon[0]
+};
 var node1 = {
 	"id":  node0.id  + denseNodes.id[1],
 	"lat": node0.lat + denseNodes.lat[1],
@@ -823,7 +825,7 @@ var node2 = {
 
 Since there are millions of IDs in the database, a number which would take several varint bytes to represent, this ends up saving us a lot of space, since the full ID only has to be stored for the first node in the group.  The rest of the IDs can be represented with as little as one byte, assuming they're consequtive (or close to it).
 
-Which means our second ID actually the *previous id* plus 4.  And our third ID comes from the next varint, `
+Which means our second ID actually the *previous id* plus 4.  And our third ID comes from the next varint, `xaa x6b`, or 6869.  Which corresponds to a database ID of 281072 (`ids[0]`) + 4 (`ids[1]`) + 6869.
 
 We can see this in the diagram, as some of the IDs encoded in this way are so efficient that it's hard to fit them into the space for their designated bytes.
 
@@ -1009,4 +1011,208 @@ var node2 = {
 	"lon": node1.lon + denseNodes.lon[2]
 };
 ```
+
+#### DenseInfo
+
+Remember that DenseInfo block we skipped?  Let's go back and take a look at it.
+
+Our PrimitiveGroup started at byte 2,172, followed by 8 bytes to provide the start and length of the DenseNodes message, followed by 8,220 bytes of IDs and the three bytes that gave us that length.
+
+So our DenseInfo should live at 2172 + 8 + 8220 + 3.  Byte 10,403, here we come!
+
+![A corgi running towards the camera through a hallway.](./gifs/corgi_racing.gif)
+
+> xxd -s 10403 -l 192  examples/primitive_block.bin
+
+```
+000028a3: 2ae9 d704 0ac0 3e02 0207 0303 0303 0303  *.....>.........
+000028b3: 0504 0402 0202 0304 0502 0705 0608 0402  ................
+000028c3: 0303 0602 0203 0202 0203 0303 0204 0404  ................
+000028d3: 0404 0404 0404 0303 0404 0404 0404 0404  ................
+000028e3: 0404 0404 0404 0404 0404 0404 0404 0404  ................
+000028f3: 0404 0404 0404 0404 0304 0404 0404 0404  ................
+00002903: 0404 0404 0404 0404 0404 0404 0504 0404  ................
+00002913: 0404 0404 0404 0404 0404 0404 0505 0404  ................
+00002923: 0404 0404 0404 0404 0602 0202 0202 0202  ................
+00002933: 0202 0202 0403 0304 0404 0202 0202 0502  ................
+00002943: 0302 0202 0203 0203 0a02 0202 0202 0302  ................
+00002953: 0202 0404 0203 0303 0304 0303 0303 0302  ................
+```
+
+These all take about a byte to store because there aren't many versions for each node.  As long as we stay under 255 `xFF` different versions, we end up with some very efficiently stored version numbers here.
+
+I could make a diagram for this, but since we'll be doing the same work we've been doing the whole time, and we're now in the final stretch of our tutorial, let's just try with raw xxd output.
+
+`x2a` is our fieldwire byte.  Field number 5 (denseinfo, like we're expecting to find), wiretype 2.  The next three bytes `xe9 xd7 x04` tell us our DenseInfo message is 76,777 bytes long.
+
+Then we get our trusty byte `x0a` which tells us this has a field number of 1 and a wiretype of 2.  For a [DenseInfo message](https://github.com/brettch/OSM-binary/blob/master/src/osmformat.proto#L155), that means a "version" field as a length-delimited, packed repeating section of varints.
+
+Nothing we haven't seen before.
+
+`xc0 x3e` tells us the length of the data, 8000 bytes, and then we're straight on to the numbers.
+
+We can decode the first three version numbers by hand fairly easily. `x02` = 2, `x02` = 2, `x07` = 7.  They're not delta-encoded, so these are their full values.
+
+Let's skip the next 7,997 bytes to get to our next field.
+
+> xxd -s 18410 -l 192  examples/primitive_block.bin
+
+```
+000047ea: 12a8 cd01 8a9f 89ba 0a00 d0e8 f94e bddd  .............N..
+000047fa: 96b8 01fe d181 6400 0000 af95 e97c e2f2  ......d......|..
+0000480a: dc82 0100 00b2 a6fc 5b00 00a5 9cb3 b001  ........[.......
+0000481a: faf6 9f06 92ea 8d13 dd84 c64c f8f7 82a8  ...........L....
+0000482a: 0185 f3b4 8501 02b6 d0aa a101 a5d7 d4a6  ................
+0000483a: 01a9 fba3 1df0 b8e0 11da efba 26ee ddf1  ............&...
+0000484a: 9701 cf82 8dd0 0100 f6d7 d881 01c9 d5d8  ................
+0000485a: 8101 0000 08ac a29b 3800 f1a1 9b38 d2c5  ........8....8..
+0000486a: fe0a c4d2 865e 0000 0000 0000 00cf 9685  .....^..........
+0000487a: 6900 92ba 8569 0000 0000 0201 0000 0201  i....i..........
+0000488a: 0000 0000 0002 0000 0000 0000 0000 0000  ................
+0000489a: 0000 0000 008b ba85 69de bb85 6900 0002  ........i...i...
+```
+
+Check out all those efficiently stored delta varints!
+
+![Wesley Crusher from Star Trek backs up in amazement.](./gifs/wesley_wow.gif)
+
+Are we in the right place?  `x12` = 00010 010 = field 2 (timestamp), wiretype 2.
+
+Checking the DenseInfo Message definition, looks like we're where we want to be.
+
+```
+repeated sint64 timestamp = 2 [packed = true]; // DELTA coded
+```
+
+These are delta-encoded timestamps in a packed field.  `0xa8 0xcd 0x01` tells us it's 26,280 bytes long.
+
+Decoding `0x8a 0x9f 0x89 0xba 0x0a` as our first signed varint gives us 1403070405.  That's seconds since 12AM on January 1, 1970 in epoch time, which happens to be Wednesday, June 18, 2014 5:46:45 AM.  We know it's not milisecond precision because that would give us Friday, June 12, 1970 9:25:04 AM, long before OpenStreetMap first started adding data.
+
+The second timestamp is probably our easiest decoding exercise yet. `x00`, or 0, or the previous timestamp + 0.  It's the exact same value.
+
+The third and last timestamp we'll be decoding right now is `0xd0 0xe8 0xf9 0x4e`, or 82786856 as a varint.  Which means the next item in our DenseInfo has a timestamp of roughly two and a half years after the first.  Adding it to our previous timestamp, we get 1485857261, or Tuesday, January 31, 2017 10:07:41 AM.
+
+The next three fields are all delta-encoded packed repeating varints, which you should have a lot of experience in by now.  See if you can decode the first three values of each.
+
+The changeset field starts with `x1a` (`00011 010`) at byte 44694.
+
+> xxd -s 44694 -l 192  examples/primitive_block.bin
+
+```
+0000ae96: 1ad5 a601 f2a8 f715 009c f5d0 15cb 8696  ................
+0000aea6: 25e4 94a9 0e00 0000 89d4 fb10 baf0 ae12  %...............
+0000aeb6: 0000 bad3 f119 0000 d3ab 9a27 c8a0 51d4  ...........'..Q.
+0000aec6: e695 0287 bfa9 08e0 f587 1ca7 c2af 1800  ................
+0000aed6: 88ea be1f c9aa 8e20 f5f2 8803 90dc e601  ....... ........
+0000aee6: d497 9c04 908d c420 f380 c726 00d2 90b7  ....... ...&....
+0000aef6: 11d1 90b7 1100 0000 e4f3 8206 00e3 f382  ................
+0000af06: 06ec a890 01a6 98ba 0b00 0000 0000 0000  ................
+0000af16: 91c1 ca0c 0092 c1ca 0c00 0000 0000 0000  ................
+0000af26: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0000af36: 0000 0000 0000 0000 91c1 ca0c 92c1 ca0c  ................
+0000af46: 0000 0000 0000 0000 0000 e5d0 0100 0000  ................
+```
+
+It goes on for `0xd5 0xa6 0x01` (21,333) bytes, plus the four bytes to specify the field and length.  All those `x00` bytes are nodes that are a part of the same changeset as the last non-zero varint.
+
+Then we get the uid field starting at 66,031, with `x22` (`00100 010` field 4 or "uid") and lasting for `0xe8 0x63` (12,776) bytes.
+
+> xxd -s 66031 -l 192  examples/primitive_block.bin
+
+```
+000101ef: 22e8 63f0 fd02 00f2 fafd 02b7 abf4 02d6  ".c.............
+000101ff: d2a3 0100 0000 e390 9401 d9cc 0b00 0000  ................
+0001020f: 0000 dacc 0bed d21a d0e3 1c91 9f0c cca1  ................
+0001021f: e702 f3d5 e102 00ac cfac 02ab cfac 02d7  ................
+0001022f: cb05 bdc4 10e8 8309 80d2 de03 a991 d703  ................
+0001023f: 0094 9f9e 0193 9f9e 0100 0000 d5c0 0700  ................
+0001024f: d6c0 07b0 8e0a d6db 3f00 0000 0000 0000  ........?.......
+0001025f: 85ea 4900 86ea 4900 0000 0000 0000 0000  ..I...I.........
+0001026f: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0001027f: 0000 0000 0000 85ea 4986 ea49 0000 0000  ........I..I....
+0001028f: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0001029f: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+```
+
+You'll notice a lot of `x00` bytes in this stretch of the data; this is because users tend to submit multiple nodes at once.  Every span of `x00` bytes is likely to be a group of contributes from the user last specified by reference to the stringtable.
+
+Skipping the next 12,776 bytes plus the three it took to establish the field and length, we get 78810 as the start of our "user_sid" field.
+
+> xxd -s 78810 -l 192  examples/primitive_block.bin
+
+```
+000133da: 2ab3 4102 0002 0602 0000 0002 0200 0000  *.A.............
+000133ea: 0000 0104 0202 0206 0002 0107 0312 020f  ................
+000133fa: 0009 0a00 0000 0e00 0d07 1a00 0000 0000  ................
+0001340a: 0000 1100 1200 0000 0000 0000 0000 0000  ................
+0001341a: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0001342a: 0000 0000 1112 0000 0000 0000 0000 0000  ................
+0001343a: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0001344a: 0000 0000 0000 0000 0000 0000 0000 0000  ................
+0001345a: 0000 0000 0011 0000 0000 0000 0000 0000  ................
+0001346a: 0300 0000 0000 0400 0000 0304 0000 0000  ................
+0001347a: 0003 0403 0308 0000 0000 1615 0000 0720  ...............
+0001348a: 1700 0000 0013 1400 0000 0000 0000 0000  ................7: 1ce2 14b0 01fc c036 9baf 2990 67f8 14e8  .......6..).g...
+```
+
+The first byte, `x2a` (`00101 010`) gives us our field number (5 for "user_sid") and wiretype, followed by a length of `0xb3 0x41` (8371) bytes.
+
+Let's take a moment to look at the first varint, `x02`, which is 1 as an [signed varint](https://developers.google.com/protocol-buffers/docs/encoding#signed-integers).  That's not a string!  But it does correspond to the first position in our StringsTable.
+
+Remember when we were pondering the meaning of that enigmatic string, "jaakkoh"?  jakkoh just happens to be the username of the user who contributed the data stored in this first block of the Planetfile.  The next byte, being `x00`, means that the string position of the second node in the dataset is *also* 1, meaning "jaakkoh" happens to have contributed the first two nodes in our dataset.
+
+The next byte, `x02`, is a one again, and means that a user named "GidonW" contributed the third node in the dataset.  Remember it's delta-encoded, so 1 + 1 = 2, which means we take the string from the second field in the stringtable.
+
+If you're being particularly observant, you'll notice the same patern of zero-groups from before, just slightly offset because the string IDs take a different number of bytes to store.
+
+The last field in DenseInfo is the visible field, but we know we don't have that because when we skip the rest of the "user_sid" field...
+
+> xxd -s 87184 -l 192  examples/primitive_block.bin
+
+```
+00015490: 42e7 8001 b28c a9f3 029c 8101 81c5 49aa  B.............I.
+000154a0: a06c b581 01b9 6fa5 6aa9 78b1 41b9 ca5e  .l....o.j.x.A..^
+000154b0: f789 0115 a3ce 0220 b79d 02cc 900c bee7  ....... ........
+000154c0: 478d d10b d8f6 3a81 9722 a089 25c6 50d4  G.....:.."..%.P.
+000154d0: 1ebf cb0a b0e8 0af1 a416 bcf6 25db e92f  ............%../
+000154e0: e64d b4fd 02a8 811a 9340 8f3f cf0f f43f  .M.......@.?...?
+000154f0: 94fb 11b2 4789 9736 e7ab 12d6 9647 f718  ....G..6.....G..
+00015500: d722 f120 9107 e602 f809 f407 970b 8b01  .". ............
+00015510: fc01 8b02 9d05 8314 ad62 c362 c71b b13e  .........b.b...>
+00015520: 8312 f96b 81c9 01bf 5ae1 25cf 0ec3 10bb  ...k....Z.%.....
+00015530: 1c93 0dbd 0692 0282 07ba 23da 2bec 18fa  ..........#.+...
+00015540: 05ba 01f9 01b7 25db 0dc1 07d6 08df 08f5  ......%.........
+```
+
+We get a fieldwire byte of `x42` (`01000 010`), meaning a field number of 8, which doesn't exist in the DenseInfo definition.
+
+It does, however, exist in the DenseNodes message which *contains* the denseinfo field.
+
+We've seen this block before: It's our latitude data.
+
+Now that we have all of our DenseInfo message decoded, we can use the same principle as we did earlier for the other DenseNodes fields.  Just don't forget about the delta encoding.
+
+```
+var node0 = {
+	"id":  denseNodes.id[0],
+	"lat": denseNodes.lat[0],
+	"lon": denseNodes.lon[0],
+	"version":   denseInfo.version[0],
+	"timestamp": denseInfo.timestamp[0],
+	"changeset": denseInfo.changeset[0],
+	"uid":       denseInfo.uid[0],
+	"user_sid":  denseInfo.user_sid[0]
+};
+var node1 = {
+	"id":  node0.id  + denseNodes.id[1],
+	"lat": node0.lat + denseNodes.lat[1],
+	"lon": node0.lon + denseNodes.lon[1],
+	"version":   denseInfo.version[1],
+	"timestamp": node0.timestamp + denseInfo.timestamp[1],
+	"changeset": node0.changeset + denseInfo.changeset[1],
+	"uid":       node0.uid + denseInfo.uid[1],
+	"user_sid":  node0.user_sid + denseInfo.user_sid[1]
+};
+```
+
 
