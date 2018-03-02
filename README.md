@@ -658,7 +658,7 @@ So, as a signed int, we can divide 562144 by two to get our first ID: 281072.
 
 Next up we have a pretty easy byte to decode: `x04`.
 
-Our next ID must be 4!  Again, though, this would be wrong.  Our next ID is actually 281076.
+Our next ID must be 2 (sint, so 4 divided by 2)!  Again, though, this would be wrong.  Our next ID is actually 281074.
 
 ##### Delta-Encoding
 
@@ -684,7 +684,7 @@ var node2 = {
 
 Since there are millions of IDs in the database, a number which would take several varint bytes to represent, this ends up saving us a lot of space, since the full ID only has to be stored for the first node in the group.  The rest of the IDs can be represented with as little as one byte, assuming they're consequtive (or close to it).
 
-Which means our second ID actually the *previous id* plus 4.  And our third ID comes from the next varint, `xaa x6b`, or 6869.  Which corresponds to a database ID of 281072 (`ids[0]`) + 4 (`ids[1]`) + 6869.
+Which means our second ID actually the *previous id* plus 4.  And our third ID comes from the next varint, `xaa x6b`, or 6869.  Which corresponds to a database ID of 281072 (`ids[0]`) + 2 (`ids[1]`) + 6867.
 
 We can see this in the diagram, as some of the IDs encoded in this way are so efficient that it's hard to fit them into the space for their designated bytes.
 
