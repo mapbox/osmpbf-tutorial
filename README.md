@@ -639,7 +639,22 @@ It's actually 281072.
 
 To figure out why, check the PrimitiveGroup specification again.  *sint* is different than *int*.  It's a *signed integer*, meaning it can have a negative value, which takes an extra bit to store.  So far, the varints we've seen as length delimiters have been *unsigned*, since there's no reason to ever say "the last five bits were a string" in a way that makes sense to the protobuf library.
 
-So, as a signed int, we have our first ID: 281072.
+Signed ints are pretty neat!  If you check out the [protobuf docs](https://developers.google.com/protocol-buffers/docs/encoding#signed-integers), they do this little ZigZag (official terminology, not mine) between negative and positive numbers.
+
+
+| int | sint |
+| --- | ---- |
+|  0  |   0  |
+|  1  |  -1  |
+|  2  |   1  |
+|  3  |  -2  |
+|  4  |   2  |
+| 42  |  21  |
+| 43  | -21  |
+
+Google gives us the handy equation of `(n << 1) ^ (n >> 31)`, but as a general rule of thumb when just looking at the data yourself, you can divide by two and if you get .5 left over, get rid of the remainder and make it negative.  All the even numbers are positive and the odd numbers are negative.
+
+So, as a signed int, we can divide 562144 by two to get our first ID: 281072.
 
 Next up we have a pretty easy byte to decode: `x04`.
 
