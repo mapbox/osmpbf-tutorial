@@ -1119,4 +1119,4 @@ latitude = .000000001 * (lat_offset + (granularity * lat))
 longitude = .000000001 * (lon_offset + (granularity * lon))
 ```
 
-Our default date granularity is 1000, meaning the timestamps are stored as milliseconds since January 1, 1970.
+Our default date granularity is 1000, meaning the timestamps should be stored as milliseconds since January 1, 1970.
